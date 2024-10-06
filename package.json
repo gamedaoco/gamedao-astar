@@ -1,17 +1,23 @@
 {
   "name": "gamedao-astar",
   "version": "1.0.0",
-  "description": "",
+  "author": "GameDAO",
+  "description": "The full stack of GameDAO running on Astar",
+  "keywords": [],
+  "license": "UNLICENSE",
+  "engines": {
+    "node": ">=18.16.1"
+  },
   "main": "index.js",
+  "type": "module",
   "scripts": {
+    "app": "pnpm --filter app",
+    "dashboard": "pnpm --filter dashboard",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
     "format": "prettier --write .",
     "prepare": "husky install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
