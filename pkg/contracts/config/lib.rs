@@ -1,0 +1,130 @@
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
+
+#[ink::contract]
+pub mod incrementer {
+
+    /// After calling `set_code_hash` the contract storage remains the same.
+    /// If you change the storage layout in your storage struct you must
+    /// migrate your storage to include the new field.
+    #[ink(storage)]
+    #[derive(Default)]
+    pub struct Nonce {
+        count: u32,
+    }
+    #[ink(storage)]
+    #[derive(Default)]
+    pub struct Collectives {
+        count: u32,
+    }
+
+
+    impl Incrementer {
+        /// Creates a new core contract initialized with the given base value.
+        #[ink(constructor)]
+        pub fn new() -> Self {
+            Default::default()
+        }
+
+        /// Increments the counter value which is stored in the contract's storage.
+        #[ink(message)]
+        pub fn inc(&mut self) {
+            self.count = self.count.checked_add(1).unwrap();
+            ink::env::debug_println!(
+                "The new count is {}, it was modified using the original contract code.",
+                self.count
+            );
+        }
+
+        /// Returns the counter value which is stored in this contract's storage.
+        #[ink(message)]
+        pub fn get_nonce(&self) -> u32 {
+            self.nonce
+        }
+
+        /// Modifies the code which is used to execute calls to this contract address
+        /// (`AccountId`).
+        ///
+        /// We use this to upgrade the contract logic. We don't do any authorization here,
+        /// any caller can execute this method.
+        ///
+        /// In a production contract you would do some authorization here!
+        #[ink(message)]
+        pub fn set_code(&mut self, code_hash: Hash) {
+            self.env().set_code_hash(&code_hash).unwrap_or_else(|err| {
+                panic!("Failed to `set_code_hash` to {code_hash:?} due to {err:?}")
+            });
+            ink::env::debug_println!("Switched code hash to {:?}.", code_hash);
+        }
+    }
+
+    #[cfg(all(test, feature = "e2e-tests"))]
+    mod e2e_tests {
+        use super::*;
+        use ink_e2e::ContractsBackend;
+
+        type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+        #[ink_e2e::test]
+        async fn set_code_works<Client: E2EBackend>(mut client: Client) -> E2EResult<()> {
+            // Given
+            let mut constructor = IncrementerRef::new();
+            let contract = client
+                .instantiate("incrementer", &ink_e2e::alice(), &mut constructor)
+                .submit()
+                .await
+                .expect("instantiate failed");
+            let mut call_builder = contract.call_builder::<Incrementer>();
+
+            let get = call_builder.get();
+            let get_res = client.call(&ink_e2e::alice(), &get).dry_run().await?;
+            assert!(matches!(get_res.return_value(), 0));
+
+            let inc = call_builder.inc();
+            let _inc_result = client
+                .call(&ink_e2e::alice(), &inc)
+                .submit()
+                .await
+                .expect("`inc` failed");
+
+            let get = call_builder.get();
+            let get_res = client.call(&ink_e2e::alice(), &get).dry_run().await?;
+            assert!(matches!(get_res.return_value(), 1));
+
+            // When
+            let new_code_hash = client
+                .upload("updated_incrementer", &ink_e2e::alice())
+                .submit()
+                .await
+                .expect("uploading `updated_incrementer` failed")
+                .code_hash;
+
+            let new_code_hash = new_code_hash.as_ref().try_into().unwrap();
+            let set_code = call_builder.set_code(new_code_hash);
+
+            let _set_code_result = client
+                .call(&ink_e2e::alice(), &set_code)
+                .submit()
+                .await
+                .expect("`set_code` failed");
+
+            // Then
+            // Note that our contract's `AccountId` (so `contract_acc_id`) has stayed the
+            // same between updates!
+            let inc = call_builder.inc();
+
+            let _inc_result = client
+                .call(&ink_e2e::alice(), &inc)
+                .submit()
+                .await
+                .expect("`inc` failed");
+
+            let get = call_builder.get();
+            let get_res = client.call(&ink_e2e::alice(), &get).dry_run().await?;
+
+            // Remember, we updated our incrementer contract to increment by `4`.
+            assert!(matches!(get_res.return_value(), 5));
+
+            Ok(())
+        }
+    }
+}

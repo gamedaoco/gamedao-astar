@@ -1,0 +1,24 @@
+[package]
+name = "gamedao-core"
+version = "1.0.0"
+authors = ["GameDAO <dev@gamedao.co>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+ink = { version = "5.0.0", default-features = false }
+
+[dev-dependencies]
+ink_e2e = { version = "5.0.0" }
+updated-incrementer = { path = "updated-incrementer", default-features = false, features = ["ink-as-dependency"] }
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["std"]
+std = [
+    "ink/std",
+]
+ink-as-dependency = []
+e2e-tests = []
